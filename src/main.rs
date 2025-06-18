@@ -1,5 +1,6 @@
 use std::io::{stdin, stdout, Write};
 use std::sync::mpsc;
+use std::net::TcpListener;
 
 use serial_server::encode::{self, EncodeType};
 use serialport::SerialPort;
@@ -140,6 +141,13 @@ fn port_session(port: &mut dyn SerialPort, tx: mpsc::Sender<Vec<u8>>, encode_typ
                                     }
                                 };
                             }
+                            if buffer_index >= buffer.len() {
+                                // バッファがいっぱいになった場合はリセット
+                                eprintln!("Buffer overflow, resetting buffer.");
+                                tx.send(buffer[..buffer_index].to_vec())
+                                    .expect("Failed to send data through channel");
+                                buffer_index = 0;
+                            }
                         }
                     }
                     EncodeType::CRLF => {
@@ -151,6 +159,13 @@ fn port_session(port: &mut dyn SerialPort, tx: mpsc::Sender<Vec<u8>>, encode_typ
                                 tx.send(buffer[..buffer_index].to_vec())
                                     .expect("Failed to send data through channel");
                                 buffer_index = 0; // バッファをリセット
+                            }
+                            if buffer_index >= buffer.len() {
+                                // バッファがいっぱいになった場合はリセット
+                                eprintln!("Buffer overflow, resetting buffer.");
+                                tx.send(buffer[..buffer_index].to_vec())
+                                    .expect("Failed to send data through channel");
+                                buffer_index = 0;
                             }
                         }
                     }
@@ -174,6 +189,28 @@ fn server_session(rx: mpsc::Receiver<Vec<u8>>) {
     // 例えば、クライアントからの接続を待ち受けるなど
     println!("Server session started.");
 
+    let listener = TcpListener::bind("127.0.0.1:8080")
+        .expect("Failed to bind to address");
+
+    for stream in listener.incoming() {
+        let (tx_client, rx_client) = mpsc::channel::<Vec<u8>>();
+        match stream {
+            Ok(stream) => {
+                println!("Client connected: {}", stream.peer_addr().unwrap());
+                // クライアントとの通信を処理する
+                std::thread::spawn(move || {
+                    handle_client(stream, rx_client);
+                });
+                tx_client.send(rx.recv().expect("Failed to receive data from channel"))
+                    .expect("Failed to send data to client");
+            }
+            Err(e) => {
+                eprintln!("Failed to accept connection: {}", e);
+            }
+        }
+    }
+
+
     loop {
         match rx.recv() {
             Ok(data) => {
@@ -182,6 +219,26 @@ fn server_session(rx: mpsc::Receiver<Vec<u8>>) {
             }
             Err(e) => {
                 eprintln!("Failed to receive data: {}", e);
+                break; // エラーが発生した場合はループを抜ける
+            }
+        }
+    }
+}
+
+fn handle_client(mut stream: std::net::TcpStream, rx: mpsc::Receiver<Vec<u8>>) {
+    println!("Handling client: {}", stream.peer_addr().unwrap());
+    loop {
+        match rx.recv() {
+            Ok(data) => {
+                // クライアントにデータを送信
+                if let Err(e) = stream.write_all(&data) {
+                    eprintln!("Failed to write to client: {}", e);
+                    break; // エラーが発生した場合はループを抜ける
+                }
+                println!("Sent data to client: {:?}", data);
+            }
+            Err(e) => {
+                eprintln!("Failed to receive data from channel: {}", e);
                 break; // エラーが発生した場合はループを抜ける
             }
         }
