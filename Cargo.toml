@@ -7,3 +7,6 @@ edition = "2021"
 http = "1.3.1"
 serialport = "4.7.2"
 cobs = "0.3.0"
+clap = { version = "4.5.40", features = ["derive"] }
+actix-web = "4.11.0"
+serde = {version="1.0.219", features=["derive"]}

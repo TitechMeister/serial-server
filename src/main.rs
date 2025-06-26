@@ -1,60 +1,87 @@
+use core::str;
 use std::io::{stdin, stdout, Write};
 use std::sync::mpsc;
 use std::net::TcpListener;
+use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
+use clap::{Parser};
+use serde::{Deserialize, Serialize};
 
-use serial_server::encode::{self, EncodeType};
+use serial_server::encode::{EncodeType};
+use serial_server::structs::UltrasonicData;
 use serialport::SerialPort;
-fn main() {
-    let mut encode_type: EncodeType = EncodeType::CRLF; // Default encoding type
-    let args: Vec<String> = std::env::args().collect();
-    println!("{:?}", args);
-    if args.len() > 1 {
-        if args[1].starts_with("-h") || args[1].starts_with("--help") {
-            println!("Usage: {} [options]", args[0]);
-            println!("Options:");
-            println!("  -h, --help       Show this help message");
-            println!("  -e, --encode     Encode types");
-            return;
+
+#[derive(Parser, Debug)]
+#[command(next_line_help = true)]
+struct Cli {
+    /// set encoding type
+    /// 
+    /// before sending to client, decode input data from serial port.
+    /// Available options: None (default), COBS, CRLF
+    #[arg(short, long)]
+    encode: Option<String>,
+
+    #[arg(short, long, default_value = "log.txt")]
+    output: String,
+}
+
+#[get("/data/Ultrasonic")]
+async fn get_ultrasonic_data() -> impl Responder {
+    let ultrasonic_data = UltrasonicData {
+        id: 1,
+        timestamp: 1234567890,
+        altitude: 100.5,
+        temperature: 25.0,
+        received_time: 1622547800,
+    };
+    HttpResponse::Ok().json(ultrasonic_data)
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    let cli = Cli::parse();
+
+    let encode_type: EncodeType = match cli.encode.as_deref() {
+        Some("COBS") => EncodeType::COBS,
+        Some("CRLF") => EncodeType::CRLF,
+        _ => EncodeType::None,
+    };
+    match encode_type {
+        EncodeType::None => {
+            println!("Encoding type set to None (default)");
         }
-        if args[1].starts_with("-e") {
-            if args.len() > 2 {
-                if args[2] == "COBS" {
-                    encode_type = EncodeType::COBS;
-                    println!("Encoding type set to COBS");
-                } else if args[2] == "CRLF" {
-                    encode_type = EncodeType::CRLF;
-                    println!("Encoding type set to CRLF");
-                } else {
-                    println!("Unknown encoding type. Please set one of the following:");
-                    encode::print_available_encodings();
-                }
-            } else {
-                println!("No encoding type specified. Please set one of the following:");
-                encode::print_available_encodings();
-                return;
-            }
+        EncodeType::COBS => {
+            println!("Encoding type set to COBS");
+        }
+        EncodeType::CRLF => {
+            println!("Encoding type set to CRLF");
         }
     }
 
     let mut port = match port_search() {
         Some(port) => port,
         None => {
-            return;
+            panic!("No serial port found. Exiting.");
         }
     };
 
-    let (tx, rx) = mpsc::channel::<Vec<u8>>();
+    let (port_tx, port_rx) = mpsc::channel::<Vec<u8>>();
     // Start a new thread to handle the port session
     let port_thread = std::thread::spawn(move || {
-        port_session(port.as_mut(), tx, encode_type);
+        port_session(port.as_mut(), port_tx, encode_type);
     });
     let server_thread = std::thread::spawn(move || {
-        server_session(rx);
+        server_session(port_rx);
     });
 
-    // Wait for the threads to finish
-    port_thread.join().expect("Port thread panicked");
-    server_thread.join().expect("Server thread panicked");
+    HttpServer::new(|| {
+        App::new()
+            .service(get_ultrasonic_data)
+            .route("/", web::get().to(|| async { "Hello, world!" }))
+            .route("/port", web::post().to(|| async { "Port session started" }))
+    })
+    .bind(("127.0.0.1", 7878))?
+    .run()
+    .await
 }
 
 /// Returns the name of a serial port to connect to.
@@ -106,7 +133,7 @@ fn port_search() -> Option<Box<dyn serialport::SerialPort>> {
         }
     }
     println!("Port not found.");
-    return None
+    None
 }
 
 
@@ -115,12 +142,23 @@ fn port_search() -> Option<Box<dyn serialport::SerialPort>> {
 fn port_session(port: &mut dyn SerialPort, tx: mpsc::Sender<Vec<u8>>, encode_type: EncodeType) {
     let mut buffer: [u8; 1024] = [0; 1024];
     let mut buffer_index = 0;
+
+    if encode_type == EncodeType::None {
+        port.set_timeout(std::time::Duration::from_secs(1))
+            .expect("Failed to set timeout");
+    }
+
     loop {
         // ここでポートからの応答を読み取る処理を行う
         let mut read_buf: [u8; 1024] = [0; 1024];
         match port.read(&mut read_buf) {
             Ok(bytes_read) => {
                 match encode_type {
+                    EncodeType::None => {
+                        // エンコードなしの場合はそのまま送信
+                        tx.send(read_buf[..bytes_read].to_vec())
+                            .expect("Failed to send data through channel");
+                    }
                     EncodeType::COBS => {
                         // COBSエンコードの場合の処理
                         for i in 0..bytes_read {
@@ -184,10 +222,26 @@ fn port_session(port: &mut dyn SerialPort, tx: mpsc::Sender<Vec<u8>>, encode_typ
     }
 }
 
-fn server_session(rx: mpsc::Receiver<Vec<u8>>) {
+fn server_session(port_rx: mpsc::Receiver<Vec<u8>>) {
     // ここでサーバーセッションの処理を行う
     // 例えば、クライアントからの接続を待ち受けるなど
     println!("Server session started.");
+
+
+    /*
+    loop {
+        match port_rx.recv() {
+            Ok(data) => {
+                // 受信したデータを処理する
+                println!("Received data: {:?}", data);
+            }
+            Err(e) => {
+                eprintln!("Failed to receive data: {}", e);
+                break; // エラーが発生した場合はループを抜ける
+            }
+        }
+    }
+    */
 
     let listener = TcpListener::bind("127.0.0.1:8080")
         .expect("Failed to bind to address");
@@ -199,47 +253,13 @@ fn server_session(rx: mpsc::Receiver<Vec<u8>>) {
                 println!("Client connected: {}", stream.peer_addr().unwrap());
                 // クライアントとの通信を処理する
                 std::thread::spawn(move || {
-                    handle_client(stream, rx_client);
+                   // handle_client(stream, rx_client);
                 });
-                tx_client.send(rx.recv().expect("Failed to receive data from channel"))
+                tx_client.send(port_rx.recv().expect("Failed to receive data from channel"))
                     .expect("Failed to send data to client");
             }
             Err(e) => {
                 eprintln!("Failed to accept connection: {}", e);
-            }
-        }
-    }
-
-
-    loop {
-        match rx.recv() {
-            Ok(data) => {
-                // 受信したデータを処理する
-                println!("Received data: {:?}", data);
-            }
-            Err(e) => {
-                eprintln!("Failed to receive data: {}", e);
-                break; // エラーが発生した場合はループを抜ける
-            }
-        }
-    }
-}
-
-fn handle_client(mut stream: std::net::TcpStream, rx: mpsc::Receiver<Vec<u8>>) {
-    println!("Handling client: {}", stream.peer_addr().unwrap());
-    loop {
-        match rx.recv() {
-            Ok(data) => {
-                // クライアントにデータを送信
-                if let Err(e) = stream.write_all(&data) {
-                    eprintln!("Failed to write to client: {}", e);
-                    break; // エラーが発生した場合はループを抜ける
-                }
-                println!("Sent data to client: {:?}", data);
-            }
-            Err(e) => {
-                eprintln!("Failed to receive data from channel: {}", e);
-                break; // エラーが発生した場合はループを抜ける
             }
         }
     }
