@@ -1,13 +1,14 @@
 use core::str;
 use std::io::{stdin, stdout, Write};
-use std::sync::mpsc;
+use std::process::Output;
+use std::sync::{mpsc, Arc, Mutex};
 use std::net::TcpListener;
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use clap::{Parser};
 use serde::{Deserialize, Serialize};
 
 use serial_server::encode::{EncodeType};
-use serial_server::structs::UltrasonicData;
+use serial_server::structs::{self, BarometerData, DataType, SensorData, UltrasonicData};
 use serialport::SerialPort;
 
 #[derive(Parser, Debug)]
@@ -24,16 +25,32 @@ struct Cli {
     output: String,
 }
 
+struct AppState {
+    ultrasonic_rx: Arc<Mutex<mpsc::Receiver<structs::SensorData>>>,
+    barometer_rx: Arc<Mutex<mpsc::Receiver<structs::SensorData>>>,
+}
+
 #[get("/data/Ultrasonic")]
-async fn get_ultrasonic_data() -> impl Responder {
-    let ultrasonic_data = UltrasonicData {
-        id: 1,
-        timestamp: 1234567890,
-        altitude: 100.5,
-        temperature: 25.0,
-        received_time: 1622547800,
-    };
-    HttpResponse::Ok().json(ultrasonic_data)
+async fn get_ultrasonic_data(data: web::Data<AppState>) -> impl Responder {
+    let rx = data.ultrasonic_rx.lock().unwrap();
+    match rx.try_recv() {
+        Ok(data) => {
+            match data {
+                SensorData::Ultrasonic(data) => {
+                    println!("Received Ultrasonic data: {:?}", data);
+                    HttpResponse::Ok().json(data.raw)
+                }
+                _ => {
+                    println!("Received non-Ultrasonic data");
+                    HttpResponse::BadRequest().finish()
+                }
+            }
+        }
+        Err(_) => {
+            println!("No Ultrasonic data available");
+            HttpResponse::NoContent().finish()
+        }
+    }
 }
 
 #[actix_web::main]
@@ -69,12 +86,31 @@ async fn main() -> std::io::Result<()> {
     let port_thread = std::thread::spawn(move || {
         port_session(port.as_mut(), port_tx, encode_type);
     });
-    let server_thread = std::thread::spawn(move || {
-        server_session(port_rx);
+//    let server_thread = std::thread::spawn(move || {
+//       server_session(port_rx);
+//    });
+
+    // Create a channel for parsed data
+    // ここで複数のチャネルを作成する
+    let mut parsed_tx_channels: Vec<(DataType, mpsc::Sender<structs::SensorData>)> = Vec::new();
+
+    let (ultrasonic_tx, ultrasonic_rx) = mpsc::channel::<structs::SensorData>();
+    parsed_tx_channels.push((DataType::Ultrasonic, ultrasonic_tx));
+    let (baro_tx, baro_rx) = mpsc::channel::<structs::SensorData>();
+    parsed_tx_channels.push((DataType::Barometer, baro_tx));
+
+    let parse_thread = std::thread::spawn(move || {
+        parse_session(port_rx, parsed_tx_channels);
     });
 
-    HttpServer::new(|| {
+    let app_state = web::Data::new(AppState {
+        ultrasonic_rx: Arc::new(Mutex::new(ultrasonic_rx)),
+        barometer_rx: Arc::new(Mutex::new(baro_rx)),
+    });
+
+    HttpServer::new(move || {
         App::new()
+            .app_data(app_state.clone())
             .service(get_ultrasonic_data)
             .route("/", web::get().to(|| async { "Hello, world!" }))
             .route("/port", web::post().to(|| async { "Port session started" }))
@@ -170,6 +206,7 @@ fn port_session(port: &mut dyn SerialPort, tx: mpsc::Sender<Vec<u8>>, encode_typ
                                 match cobs::decode(&buffer[..buffer_index], &mut decoded_data) {
                                     Ok(decoded_length) => {
                                         // デコードされたデータを送信
+                                        print!("data: {:?}", &decoded_data[..decoded_length]);
                                         tx.send(decoded_data[..decoded_length].to_vec())
                                             .expect("Failed to send data through channel");
                                         buffer_index = 0; // バッファをリセット
@@ -260,6 +297,59 @@ fn server_session(port_rx: mpsc::Receiver<Vec<u8>>) {
             }
             Err(e) => {
                 eprintln!("Failed to accept connection: {}", e);
+            }
+        }
+    }
+}
+
+// port_rxからバイト列を受け取り、parsed_tx[]の対応するtxに送信する関数
+fn parse_session(port_rx: mpsc::Receiver<Vec<u8>>, parsed_tx: Vec<(DataType, mpsc::Sender<SensorData>)>) {
+    println!("Parse session started.");
+
+    loop {
+        let data = port_rx.recv().expect("Failed to receive data from channel");
+        match data.first() {
+            Some(&data_type_byte) => {
+                let data_type = match data_type_byte {
+                    0x50 => DataType::Ultrasonic,
+                    0x60 => DataType::GPS,
+                    0x40 => DataType::IMU,
+                    0x90 => DataType::Barometer,
+                    _ => {
+                        eprintln!("Unknown data type: {}", data_type_byte);
+                        continue; // Unknown data type, skip this iteration
+                    }
+                };
+
+                // Find the corresponding tx channel for the data type
+                if let Some((_, tx)) = parsed_tx.iter().find(|(dt, _)| *dt == data_type) {
+                    if (data_type == DataType::Ultrasonic) {
+                        let parsed_data = UltrasonicData::parse(data);
+                        let send_data = match parsed_data {
+                            Some(data) => SensorData::Ultrasonic(data),
+                            None => {
+                                eprintln!("Failed to parse Ultrasonic data");
+                                continue; // Skip this iteration if parsing fails
+                            }
+                        };
+                        tx.send(send_data).expect("Failed to send parsed data");
+                    } else if (data_type == DataType::Barometer) {
+                        let parsed_data = BarometerData::parse(data);
+                        let send_data = match parsed_data {
+                            Some(data) => SensorData::Barometer(data),
+                            None => {
+                                eprintln!("Failed to parse Barometer data");
+                                continue; // Skip this iteration if parsing fails
+                            }
+                        };
+                        tx.send(send_data).expect("Failed to send parsed data");
+                    }
+                } else {
+                    eprintln!("No channel found for data type: {:?}", data_type);
+                }
+            }
+            None => {
+                eprintln!("Received empty data");
             }
         }
     }
