@@ -26,27 +26,30 @@ struct Cli {
 }
 
 struct AppState {
-    ultrasonic_rx: Arc<Mutex<mpsc::Receiver<structs::SensorData>>>,
-    barometer_rx: Arc<Mutex<mpsc::Receiver<structs::SensorData>>>,
+    ultrasonic_latest: Arc<Mutex<Option<structs::SensorData>>>,
+    barometer_latest: Arc<Mutex<Option<structs::SensorData>>>,
 }
 
 #[get("/data/Ultrasonic")]
 async fn get_ultrasonic_data(data: web::Data<AppState>) -> impl Responder {
-    let rx = data.ultrasonic_rx.lock().unwrap();
-    match rx.try_recv() {
-        Ok(data) => {
+    let latest_ultrasonic = data.ultrasonic_latest.lock().unwrap();
+    match latest_ultrasonic.as_ref() {
+        Some(data) => {
             match data {
-                SensorData::Ultrasonic(data) => {
-                    println!("Received Ultrasonic data: {:?}", data);
-                    HttpResponse::Ok().json(data.raw)
+                SensorData::Ultrasonic(ultrasonic_data) => {
+                    println!("Latest Ultrasonic data: {:?}", ultrasonic_data);
+                    HttpResponse::Ok()
+                        .content_type("application/json")
+                        .json(ultrasonic_data.raw.clone())
                 }
                 _ => {
-                    println!("Received non-Ultrasonic data");
-                    HttpResponse::BadRequest().finish()
+                    println!("Received non-ultrasonic data");
+                    HttpResponse::BadRequest()
+                        .body("Received non-ultrasonic data")
                 }
             }
         }
-        Err(_) => {
+        None => {
             println!("No Ultrasonic data available");
             HttpResponse::NoContent().finish()
         }
@@ -90,23 +93,20 @@ async fn main() -> std::io::Result<()> {
 //       server_session(port_rx);
 //    });
 
-    // Create a channel for parsed data
-    // ここで複数のチャネルを作成する
-    let mut parsed_tx_channels: Vec<(DataType, mpsc::Sender<structs::SensorData>)> = Vec::new();
 
-    let (ultrasonic_tx, ultrasonic_rx) = mpsc::channel::<structs::SensorData>();
-    parsed_tx_channels.push((DataType::Ultrasonic, ultrasonic_tx));
-    let (baro_tx, baro_rx) = mpsc::channel::<structs::SensorData>();
-    parsed_tx_channels.push((DataType::Barometer, baro_tx));
-
-    let parse_thread = std::thread::spawn(move || {
-        parse_session(port_rx, parsed_tx_channels);
-    });
+    let ultrasonicdata = SensorData::Ultrasonic(UltrasonicData::new(0x50, 0, 0.0, 0.0, chrono::Utc::now().timestamp_millis()));
+    let barometerdata = SensorData::Barometer(BarometerData::new(0x90, 0, 0.0, 0.0, chrono::Utc::now().timestamp_millis()));
 
     let app_state = web::Data::new(AppState {
-        ultrasonic_rx: Arc::new(Mutex::new(ultrasonic_rx)),
-        barometer_rx: Arc::new(Mutex::new(baro_rx)),
+        ultrasonic_latest: Arc::new(Mutex::new(Some(ultrasonicdata))),
+        barometer_latest: Arc::new(Mutex::new(Some(barometerdata))),
     });
+
+    let app_state_clone = app_state.clone();
+    let parse_thread = std::thread::spawn(move || {
+        parse_session(port_rx, app_state_clone);
+    });
+
 
     HttpServer::new(move || {
         App::new()
@@ -303,7 +303,7 @@ fn server_session(port_rx: mpsc::Receiver<Vec<u8>>) {
 }
 
 // port_rxからバイト列を受け取り、parsed_tx[]の対応するtxに送信する関数
-fn parse_session(port_rx: mpsc::Receiver<Vec<u8>>, parsed_tx: Vec<(DataType, mpsc::Sender<SensorData>)>) {
+fn parse_session(port_rx: mpsc::Receiver<Vec<u8>>, app_state: web::Data<AppState>) {
     println!("Parse session started.");
 
     loop {
@@ -321,31 +321,26 @@ fn parse_session(port_rx: mpsc::Receiver<Vec<u8>>, parsed_tx: Vec<(DataType, mps
                     }
                 };
 
-                // Find the corresponding tx channel for the data type
-                if let Some((_, tx)) = parsed_tx.iter().find(|(dt, _)| *dt == data_type) {
-                    if (data_type == DataType::Ultrasonic) {
-                        let parsed_data = UltrasonicData::parse(data);
-                        let send_data = match parsed_data {
-                            Some(data) => SensorData::Ultrasonic(data),
-                            None => {
-                                eprintln!("Failed to parse Ultrasonic data");
-                                continue; // Skip this iteration if parsing fails
-                            }
-                        };
-                        tx.send(send_data).expect("Failed to send parsed data");
-                    } else if (data_type == DataType::Barometer) {
-                        let parsed_data = BarometerData::parse(data);
-                        let send_data = match parsed_data {
-                            Some(data) => SensorData::Barometer(data),
-                            None => {
-                                eprintln!("Failed to parse Barometer data");
-                                continue; // Skip this iteration if parsing fails
-                            }
-                        };
-                        tx.send(send_data).expect("Failed to send parsed data");
-                    }
-                } else {
-                    eprintln!("No channel found for data type: {:?}", data_type);
+                if data_type == DataType::Ultrasonic {
+                    let parsed_data = UltrasonicData::parse(data);
+                    let send_data = match parsed_data {
+                        Some(data) => SensorData::Ultrasonic(data),
+                        None => {
+                            eprintln!("Failed to parse Ultrasonic data");
+                            continue; // Skip this iteration if parsing fails
+                        }
+                    };
+                    app_state.ultrasonic_latest.lock().unwrap().replace(send_data.clone());
+                } else if data_type == DataType::Barometer {
+                    let parsed_data = BarometerData::parse(data);
+                    let send_data = match parsed_data {
+                        Some(data) => SensorData::Barometer(data),
+                        None => {
+                            eprintln!("Failed to parse Barometer data");
+                            continue; // Skip this iteration if parsing fails
+                        }
+                    };
+                    app_state.barometer_latest.lock().unwrap().replace(send_data.clone());
                 }
             }
             None => {

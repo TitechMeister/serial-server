@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone)]
 pub enum SensorData {
     Ultrasonic(UltrasonicData),
     Barometer(BarometerData),
@@ -28,7 +29,7 @@ pub enum DataType {
     Barometer = 0x90 // 気圧計
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct UltrasonicRawData {
     pub id: u8,
     pub timestamp: u32,
@@ -37,14 +38,14 @@ pub struct UltrasonicRawData {
     pub received_time: i64
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct UltrasonicData {
     pub id: DataType,
     pub raw: UltrasonicRawData,
 }
 
 impl UltrasonicData {
-    fn new(id: u8, timestamp: u32, altitude: f32, temperature: f32, received_time: i64) -> Self {
+    pub fn new(id: u8, timestamp: u32, altitude: f32, temperature: f32, received_time: i64) -> Self {
         let raw = UltrasonicRawData {
             id,
             timestamp,
@@ -75,7 +76,7 @@ impl UltrasonicData {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct BarometerRawData {
     pub id: u8,
     pub timestamp: u32,
@@ -84,13 +85,14 @@ pub struct BarometerRawData {
     pub received_time: i64
 }
 
+#[derive(Debug, PartialEq, Clone)]
 pub struct BarometerData {
     pub id: DataType,
     pub raw: BarometerRawData,
 }
 
 impl BarometerData {
-    fn new(id: u8, timestamp: u32, pressure: f32, temperature: f32, received_time: i64) -> Self {
+    pub fn new(id: u8, timestamp: u32, pressure: f32, temperature: f32, received_time: i64) -> Self {
         BarometerData {
             id: DataType::Barometer,
             raw: BarometerRawData {
