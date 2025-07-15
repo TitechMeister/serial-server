@@ -13,16 +13,16 @@ class ParserManager:
     def __init__(self):
         self.parsers = self._load_parsers()
 
-    def parse_data(self, data: bytes) -> dict:
+    def parse_data(self, data: bytes) -> tuple[dict[str, any], str]:
         """
         Parses the given byte data using the appropriate parser.
         Returns a dictionary of parsed values.
         """
         parser = self._select_parser(data, self.parsers)
         if parser is not None:
-            return parser.parse(data)
+            return parser.parse(data), parser.get_name()
         else:
-            return {}
+            return {}, None
 
     def _load_parsers(self) -> list[AbstractParser]:
         parser_instances = []
