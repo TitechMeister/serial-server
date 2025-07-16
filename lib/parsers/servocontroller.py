@@ -10,7 +10,7 @@ class ServoControllerParser(AbstractParser):
 
     @staticmethod
     def get_name() -> str:
-        return "ServoController"
+        return "servocontroller"
 
     @staticmethod
     def get_keys() -> list[str]:

@@ -10,7 +10,7 @@ class PitotParser(AbstractParser):
 
     @staticmethod
     def get_name() -> str:
-        return "Pitot"
+        return "pitot"
 
     @staticmethod
     def get_keys() -> list[str]:

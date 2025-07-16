@@ -44,7 +44,7 @@ class TachometerParser(StrainAndCadenceParser):
     """
     @staticmethod
     def get_name() -> str:
-        return "Tachometer"
+        return "tachometer"
 
     @staticmethod
     def get_id_bytes() -> list[(int, bytes)]:

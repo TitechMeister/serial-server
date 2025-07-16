@@ -10,7 +10,7 @@ class UltrasonicParser(AbstractParser):
 
     @staticmethod
     def get_name() -> str:
-        return "Ultrasonic"
+        return "ultrasonic"
 
     @staticmethod
     def get_keys() -> list[str]:

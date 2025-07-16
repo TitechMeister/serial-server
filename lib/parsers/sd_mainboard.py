@@ -10,7 +10,7 @@ class sdMainboardParser(AbstractParser):
 
     @staticmethod
     def get_name() -> str:
-        return "SD Mainboard"
+        return "sd_mainboard"
 
     @staticmethod
     def get_keys() -> list[str]:

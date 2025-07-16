@@ -1,4 +1,4 @@
-import tachometer
+import lib.parsers.tachometer as tachometer
 
 class ThrustmeterParser(tachometer.StrainAndCadenceParser):
     """
@@ -6,7 +6,7 @@ class ThrustmeterParser(tachometer.StrainAndCadenceParser):
     """
     @staticmethod
     def get_name() -> str:
-        return "Thrustmeter"
+        return "thrustmeter"
 
     @staticmethod
     def get_id_bytes() -> list[(int, bytes)]:

@@ -10,7 +10,7 @@ class GPSParser(AbstractParser):
 
     @staticmethod
     def get_name() -> str:
-        return "GPS"
+        return "gps"
 
     @staticmethod
     def get_keys() -> list[str]:
