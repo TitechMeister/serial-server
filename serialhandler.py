@@ -42,6 +42,8 @@ class serial_handler:
             data_buf = bytes()
             try:
                 data = self.ser.read_until(b'\x00')
+                if not data:
+                    continue
                 print(f"Raw data received: {data.hex()}")
                 data_buf += data[:-1]
                 if (data.endswith(b'\x00')):
@@ -55,6 +57,9 @@ class serial_handler:
                     data_buf = bytes()
             except serial.SerialTimeoutException as e:
                 print(f"Error: {e}")
+            except serial.SerialException as e:
+                print(f"Serial error: {e}")
+                return 
 
 
     def run_read_thread(self) -> Queue:
