@@ -12,6 +12,7 @@ class ParserManager:
     """
     def __init__(self):
         self.parsers = self._load_parsers()
+        self.parser_names = [parser.get_name() for parser in self.parsers]
 
     def parse_data(self, data: bytes) -> tuple[dict[str, any], str]:
         """
@@ -23,6 +24,12 @@ class ParserManager:
             return parser.parse(data), parser.get_name()
         else:
             return {}, None
+
+    def get_parser_names(self) -> list[str]:
+        """
+        Returns a list of available parser names.
+        """
+        return self.parser_names
 
     def _load_parsers(self) -> list[AbstractParser]:
         parser_instances = []

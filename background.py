@@ -10,6 +10,9 @@ def latest_data_dict(queue: Queue):
     while True:
         if not queue.empty():
             data = queue.get()
+            if data is (None, None):
+                print("connection closed")
+                return
             print(f"Latest data: {data}")
             with shared_data.data_lock:
                 shared_data.data_dict[data[1]] = data[0]  # Assuming data is a tuple (parsed_data, parser_name)

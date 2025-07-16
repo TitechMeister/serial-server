@@ -59,10 +59,16 @@ class serial_handler:
                 print(f"Error: {e}")
             except serial.SerialException as e:
                 print(f"Serial error: {e}")
+                self.queue.put((None, None))
                 return 
 
+    def get_parser_names(self) -> list[str]:
+        """
+        Returns a list of available parser names.
+        """
+        return self.parser_manager.get_parser_names()
 
-    def run_read_thread(self) -> Queue:
+    def run_thread(self) -> Queue:
         if self.ser and self.ser.is_open:
             self.read_thread = threading.Thread(target=self.read_data, daemon=True)
             self.read_thread.start()
