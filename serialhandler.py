@@ -1,3 +1,4 @@
+import time
 from serial import Serial
 import serial
 import serial.tools.list_ports as list_ports
@@ -92,6 +93,7 @@ class serial_handler:
                     if parser_name is None:
                         print("No parser found for the data.")
                     else:
+                        parsed_data["received_time"] = int(time.time() * 1000)  # Add received time in milliseconds
                         self.queue.put((parsed_data, parser_name))
                         print(f"Received data: {parsed_data}")
                     data_buf = bytes()
