@@ -61,4 +61,44 @@ def get_parsers():
     parser_names = serial_handler_instance.get_parser_names()
     return jsonify({"parsers": parser_names})
 
+@app.route('/parser/<parsername>', methods=['GET'])
+def get_parser_information(parsername):
+    info = serial_handler_instance.get_parser_information(parsername)
+    if "error" in info:
+        return jsonify(info), 404
+    return jsonify(info)
 
+@app.route('/help', methods=['GET'])
+def help_page():
+    help_content = """
+    <html>
+    <head>
+        <title>Serial Server API Help</title>
+    </head>
+    <body>
+        <h1>Serial Server API</h1>
+        <p>This API allows you to interact with the serial server to manage serial connections and retrieve parsed data.</p>
+        <p>Use the following endpoints to interact with the server:</p>
+        <h2>API Endpoints</h2>
+        <ul>
+            <li><strong>/test</strong>: A test endpoint to check server functionality.</li>
+            <li><strong>/serial/state</strong>: Get the current state of the serial connection.</li>
+            <li><strong>/serial/available_ports</strong>: List all available serial ports.</li>
+            <li><strong>/serial/connect</strong>: Connect to a specified serial port.</li>
+            <li><strong>/serial/disconnect</strong>: Disconnect from the current serial port.</li>
+            <li><strong>/data/&lt;parsername&gt;</strong>: Get parsed data for a specific parser.</li>
+            <li><strong>/data</strong>: Get all parsed data from all parsers.</li>
+            <li><strong>/parsers</strong>: List all available parsers.</li>
+            <li><strong>/parser/&lt;parsername&gt;</strong>: Get information about a specific parser.</li>
+        </ul>
+        <h2>HELP</h2>
+        <p>For more information on how to use the API, please refer to the
+        <a href="https://github.com/TitechMeister/serial-server">documentation</a>.
+    </body>
+    </html>
+    """
+    return help_content, 200, {'Content-Type': 'text/html'}
+
+@app.route('/', methods=['GET'])
+def root():
+    return help_page()

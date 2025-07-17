@@ -2,21 +2,18 @@
 
 An application that outputs input from a serial port as an HTTP server.
 
+[日本語ドキュメント](README-ja.md)
+
 ## Usage
 
-For standart use
+First, please setup python virtual environments.
 
 ```shell
-$ cargo run
+$ source setup.sh
 ```
 
-If you want to decode serialport inputs in a specific way, please run as below.
+start http server
 
 ```shell
-$ cargo run -- -e {encode-type}
+$ python3 serialserver.py
 ```
-
-You can currently choose
-
-- COBS
-- CRLF (store inputs to buffer until '\n' received)

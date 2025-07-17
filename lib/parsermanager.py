@@ -31,6 +31,18 @@ class ParserManager:
         """
         return self.parser_names
 
+    def get_parser_information(self, parsername: str) -> dict:
+        """
+        Returns information about a specific parser.
+        """
+        for parser in self.parsers:
+            if parser.get_name() == parsername:
+                return {
+                    "name": parser.get_name(),
+                    "keys": parser.get_keys(),
+                }
+        return {"error": "Parser not found"}
+
     def _load_parsers(self) -> list[AbstractParser]:
         parser_instances = []
         for _, module_name, _ in pkgutil.iter_modules(parsers_path):

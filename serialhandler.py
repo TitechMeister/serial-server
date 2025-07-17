@@ -56,6 +56,12 @@ class serial_handler:
         """
         return self.parser_manager.get_parser_names()
 
+    def get_parser_information(self, parsername: str) -> dict:
+        """
+        Returns information about a specific parser.
+        """
+        return self.parser_manager.get_parser_information(parsername)
+
 
     def read_data(self):
         """
