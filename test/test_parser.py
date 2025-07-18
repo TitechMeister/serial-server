@@ -10,9 +10,11 @@ import lib.cobs as cobs
 
 def test_parser():
     myParsermanager = parsermanager.ParserManager()
-    with open("main-log.bin", "rb") as f:
+    with open("test/main-log.bin", "rb") as f:
         data = f.read()
     index = 0
+    print(f"Data length: {len(data)} bytes")
+    data = list(data)
     while index < len(data):
         decoded_data, index = cobs.cobs_decode(data, index)
         decoded_data = bytes(decoded_data)
@@ -22,3 +24,6 @@ def test_parser():
             continue
         parsed_data = myParsermanager.parse_data(decoded_data)
         print(f"Parsed data: {parsed_data}\n")
+
+if __name__ == "__main__":
+    test_parser()

@@ -14,7 +14,7 @@ def cobs_decode(enc_data:list[int], index:int=0):
 
             rest_index: 残りのエンコードデータの開始インデックス。
     """
-    if type(enc_data) is not list or not all(isinstance(i, int) for i in enc_data):
+    if type(enc_data) is not list:
         raise TypeError("enc_data must be a list of integers")
     dec_data:list[int] = []
     enc_idx = index
@@ -24,6 +24,8 @@ def cobs_decode(enc_data:list[int], index:int=0):
     is_end = False
 
     while enc_idx < len(enc_data):
+        if (enc_data[enc_idx] < 0 or enc_data[enc_idx] > 255):
+            raise ValueError("enc_data must contain integers in the range 0-255")
         if next_0x00 != 0:
             dec_data.append(enc_data[enc_idx])
             enc_idx += 1
