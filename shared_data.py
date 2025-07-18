@@ -1,3 +1,8 @@
+"""
+# shared_data.py
+This module contains shared data structures and state management for the serial server.
+It is used for thread-safe access to data and serial connection state.
+"""
 import threading
 from enum import Enum, auto
 

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 
 import shared_data
-from serialhandler import serial_handler_instance
+from serialhandler.serialhandler import serial_handler_instance
 
 
 app = Blueprint("api", __name__)

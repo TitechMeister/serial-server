@@ -15,6 +15,7 @@ class serial_handler:
         self.read_thread = None
         self.parser_manager = ParserManager()
         self.queue = Queue(10)
+        self.cannot_read_count = 0
 
     def list_serial_ports(self) -> list[dict[str, str, str]]:
         available_ports = []
@@ -69,7 +70,10 @@ class serial_handler:
         If the state changes to something other than READING, it stops reading.
         """
         if not self.ser or not self.ser.is_open:
-            print("Serial port is not open. Cannot start reading.")
+            self.cannot_read_count += 1
+            if self.cannot_read_count > 10:
+                print("Serial port is not open. Cannot start reading.")
+                self.cannot_read_count = 0
             return
         with shared_data.state_lock:
             shared_data.serial_state = shared_data.SerialState.READING
