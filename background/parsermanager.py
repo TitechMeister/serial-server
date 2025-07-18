@@ -3,8 +3,8 @@ import importlib
 import os
 import pkgutil
 import warnings
-from lib.abstractparser import AbstractParser
-from lib.parsers import __path__ as parsers_path
+from background.abstractparser import AbstractParser
+from background.parsers import __path__ as parsers_path
 
 class ParserManager:
     """
@@ -46,7 +46,7 @@ class ParserManager:
     def _load_parsers(self) -> list[AbstractParser]:
         parser_instances = []
         for _, module_name, _ in pkgutil.iter_modules(parsers_path):
-            module = importlib.import_module(f"lib.parsers.{module_name}")
+            module = importlib.import_module(f"background.parsers.{module_name}")
             if hasattr(module, "parser"):
                 instance = getattr(module, "parser")
                 if isinstance(instance, AbstractParser):

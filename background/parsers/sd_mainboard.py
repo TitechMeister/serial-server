@@ -1,4 +1,4 @@
-from lib.abstractparser import AbstractParser
+from background.abstractparser import AbstractParser
 import struct
 
 class sdMainboardParser(AbstractParser):

@@ -1,7 +1,6 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, current_app, request, jsonify
 
 import shared_data
-from serialhandler.serialhandler import serial_handler_instance
 import lib.cobs
 
 
@@ -15,6 +14,7 @@ def get_serial_state():
 
 @app.route('/serial/available_ports', methods=['GET'])
 def get_available_ports():
+    serial_handler_instance = current_app.config["serial_handler_instance"]
     ports = serial_handler_instance.list_serial_ports()
     return jsonify({"available_ports": ports})
 
@@ -25,6 +25,7 @@ def connect_serial():
     baudrate = data.get("baudrate", 115200)
     if not portname:
         return jsonify({"error": "Port name is required"}), 400
+    serial_handler_instance = current_app.config["serial_handler_instance"]
     success = serial_handler_instance.connect(portname, baudrate)
     if success:
         return jsonify({"status": "connected"})
@@ -33,6 +34,7 @@ def connect_serial():
     
 @app.route('/serial/disconnect', methods=['POST'])
 def disconnect_serial():
+    serial_handler_instance = current_app.config["serial_handler_instance"]
     if serial_handler_instance.disconnect():
         return jsonify({"status": "disconnected"})
     else:
@@ -48,6 +50,7 @@ def write_serial():
         encoded_payload = bytes(lib.cobs.cobs_encode(payload))
     except Exception as e:
         return jsonify({"error": f"Encoding error: {str(e)}"}), 500
+    serial_handler_instance = current_app.config["serial_handler_instance"]
     success = serial_handler_instance.write_data(encoded_payload)
     if success:
         return jsonify({"status": "data sent"})
@@ -75,12 +78,14 @@ def all_parsed_data():
 
 @app.route('/parsers', methods=['GET'])
 def get_parsers():
-    parser_names = serial_handler_instance.get_parser_names()
+    background_instance = current_app.config["background_instance"]
+    parser_names = background_instance.get_parser_names()
     return jsonify({"parsers": parser_names})
 
 @app.route('/parser/<parsername>', methods=['GET'])
 def get_parser_information(parsername):
-    info = serial_handler_instance.get_parser_information(parsername)
+    background_instance = current_app.config["background_instance"]
+    info = background_instance.get_parser_information(parsername)
     if "error" in info:
         return jsonify(info), 404
     return jsonify(info)
@@ -110,7 +115,7 @@ def help_page():
         </ul>
         <h2>HELP</h2>
         <p>For more information on how to use the API, please refer to the
-        <a href="https://github.com/TitechMeister/serial-server">documentation</a>.
+        <a href="https://github.com/TitechMeister/serial-server/tree/main/docs/api.md">documentation</a>.
     </body>
     </html>
     """

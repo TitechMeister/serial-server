@@ -1,4 +1,4 @@
-from lib.abstractparser import AbstractParser
+from background.abstractparser import AbstractParser
 from abc import abstractmethod
 import struct
 

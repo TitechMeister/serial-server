@@ -6,14 +6,12 @@ import threading
 from queue import Queue
 
 import lib.cobs as cobs
-from lib.parsermanager import ParserManager
 import shared_data
 
 class serial_handler:
     def __init__(self):
         self.ser = None
         self.read_thread = None
-        self.parser_manager = ParserManager()
         self.queue = Queue(10)
         self.cannot_read_count = 0
 
@@ -50,18 +48,6 @@ class serial_handler:
         else:
             print("Serial port is not open.")
             return False
-
-    def get_parser_names(self) -> list[str]:
-        """
-        Returns a list of available parser names.
-        """
-        return self.parser_manager.get_parser_names()
-
-    def get_parser_information(self, parsername: str) -> dict:
-        """
-        Returns information about a specific parser.
-        """
-        return self.parser_manager.get_parser_information(parsername)
 
     def write_data(self, data: bytes) -> bool:
         if not self.ser or not self.ser.is_open:
@@ -110,13 +96,8 @@ class serial_handler:
                 data_buf += data[:-1]
                 if (data.endswith(b'\x00')):
                     decoded_data, _ = cobs.cobs_decode(data)
-                    parsed_data, parser_name = self.parser_manager.parse_data(bytes(decoded_data))
-                    if parser_name is None:
-                        print("No parser found for the data.")
-                    else:
-                        parsed_data["received_time"] = int(time.time() * 1000)  # Add received time in milliseconds
-                        self.queue.put((parsed_data, parser_name))
-                        print(f"Received data: {parsed_data}")
+                    received_time = int(time.time() * 1000)  # Current time in milliseconds
+                    self.queue.put((bytes(decoded_data), received_time))
                     data_buf = bytes()
             except serial.SerialException as e:
                 print(f"Serial error: {e}")
@@ -141,6 +122,3 @@ class serial_handler:
     def get_serial_thread(self) -> tuple[Queue, threading.Thread]:
         self.serial_thread = threading.Thread(target=self.serial_handle, daemon=True)
         return self.queue, self.serial_thread
-
-
-serial_handler_instance = serial_handler()

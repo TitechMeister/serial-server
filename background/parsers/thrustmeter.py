@@ -1,4 +1,4 @@
-import lib.parsers.tachometer as tachometer
+import background.parsers.tachometer as tachometer
 
 class ThrustmeterParser(tachometer.StrainAndCadenceParser):
     """
