@@ -63,6 +63,17 @@ class serial_handler:
         """
         return self.parser_manager.get_parser_information(parsername)
 
+    def write_data(self, data: bytes) -> bool:
+        if not self.ser or not self.ser.is_open:
+            print("Serial port is not open.")
+            return False
+        try:
+            print(f"Writing data: {data.hex()}")
+            self.ser.write(data)
+            return True
+        except serial.SerialException as e:
+            print(f"Error writing data: {e}")
+            return False
 
     def read_data(self):
         """

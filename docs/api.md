@@ -6,6 +6,7 @@
   - [`GET /serial/available_ports`](#get-serialavailable_ports)
   - [`POST /serial/connect`](#post-serialconnect)
   - [`POST /serial/disconnect`](#post-serialdisconnect)
+  - [`POST /serial/write`](#post-serialwrite)
 - [`/data/`](#data)
   - [`GET /data`](#get-data)
   - [`GET /data/<parsername>`](#get-dataparsername)
@@ -166,6 +167,70 @@ port_numberはデフォルトが7878で、起動時にオプション-pまたは
 ```json
 {"status": "disconnected"}
 ```
+
+### `POST /serial/write`
+
+#### 概要
+
+現在開いているシリアルポートにデータを書き込みます。
+
+#### リクエストボディ
+
+**Content-Type**: `application/json`
+
+```json
+{
+    "payload": [byte],
+}
+```
+
+`byte`はすべて0~255の範囲内の整数である必要があります。
+
+#### レスポンス
+
+**200 OK**
+
+```json
+{"status": "data sent"}
+```
+
+**400 Bad Request**
+
+```json
+{"error": "Payload is required"}
+```
+
+**500 Internal Server Error**
+
+エンコードに失敗した場合(payloadのvalueが正しくない時など)
+
+```json
+{"error": "Encoding error: {error}"}
+```
+
+エンコードには成功したが、送信に失敗した場合
+
+```json
+{"error": "port is not open or failed to write"}
+```
+
+#### 具体例
+
+**リクエスト:**
+
+```json
+{
+    "portname": "/dev/cu.usbmodem1101",
+    "baudrate": 115200
+}
+```
+
+**レスポンス:**
+
+```json
+{"status": "connected"}
+```
+
 
 ## `/data/`
 

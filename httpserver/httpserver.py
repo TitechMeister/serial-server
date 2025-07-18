@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 
 import shared_data
 from serialhandler.serialhandler import serial_handler_instance
+import lib.cobs
 
 
 app = Blueprint("api", __name__)
@@ -36,6 +37,22 @@ def disconnect_serial():
         return jsonify({"status": "disconnected"})
     else:
         return jsonify({"status": "port is not open"}), 204
+
+@app.route('/serial/write', methods=['POST'])
+def write_serial():
+    data = request.json
+    payload = data.get("payload")
+    if not payload:
+        return jsonify({"error": "Payload is required"}), 400
+    try:
+        encoded_payload = bytes(lib.cobs.cobs_encode(payload))
+    except Exception as e:
+        return jsonify({"error": f"Encoding error: {str(e)}"}), 500
+    success = serial_handler_instance.write_data(encoded_payload)
+    if success:
+        return jsonify({"status": "data sent"})
+    else:
+        return jsonify({"error": "port is not open or failed to write"}), 500
 
 @app.route('/test', methods=['GET'])
 def test():
