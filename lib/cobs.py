@@ -14,8 +14,8 @@ def cobs_decode(enc_data:list[int], index:int=0):
 
             rest_index: 残りのエンコードデータの開始インデックス。
     """
-    if type(enc_data) is not list:
-        raise TypeError("enc_data must be a list of integers")
+    if type(enc_data) is not list and type(enc_data) is not str and type(enc_data) is not bytes:
+        raise TypeError("enc_data must be a list of integers, a string, or bytes")
     dec_data:list[int] = []
     enc_idx = index
 
@@ -58,12 +58,14 @@ def cobs_decode(enc_data:list[int], index:int=0):
 
 
 def cobs_encode(data:list[int]):
-    if type(data) is not list or not all(isinstance(i, int) and 0 <= i < 256 for i in data):
-        raise TypeError("data must be a list of integers and each integer must be in the range 0-255")
+    if type(data) is not list and type(data) is not str and type(data) is not bytes:
+        raise TypeError("data must be a list of integers, a string, or bytes")
     encoded_data:list[int] = []
     encoding_block:list[int] = [0x00]
 
     for byte in data:
+        if (byte < 0 or byte > 255):
+            raise ValueError("data must contain integers in the range 0-255")
         if len(encoding_block) == 255:
             # エンコードブロックが255バイト(すなわち、254個連続して0x00を含まない)場合は、
             # 現在のエンコードブロックを追加し、新しいブロックを開始する。
