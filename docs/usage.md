@@ -106,7 +106,7 @@ parser = SampleParser()
 
 - `AbstractParser`クラスをimportし、継承してください。このクラスを継承してない場合、実行時エラーになります。
 - `get_name()`, `get_keys()`, `get_data_length()`, `get_id_bytes()`, `parse(self, data: bytes)`を定義してください。AbstractParserクラスの中で`abstractMethod`として定義されているため、実装しないと実行時エラーになります。
-- `get_name()`メソッドで定義した名前が、parserの名前として扱われます。APIエンドポイントの`parsers`や`parser/<parsername>`などで用いられる名前となります。
+- `get_name()`メソッドで定義した名前が、parserの名前として扱われます。APIエンドポイントの`parsers`や`parser/<parsername>`などで用いられる名前となります。そのため、**小文字で統一することを推奨します。**
 - `get_keys()`メソッドで定義したkeyが、`parser/<parsername>`で帰ってくるkey一覧になります。**`parse()`メソッドでの返り値と異なる値でも定義できてしまうため、実装には十分気をつけてください。**
 - `get_data_length()`で定義した値と`get_id_bytes()`で定義した値に一致するデータのみがparseされます。こちらも**parse()メソッドの実装と異なる値でも定義できてしまうため、実装時には注意するようにしてください。**
 - `get_id_bytes()`メソッドは、`(bytesの中の開始インデックス(int), 実際にきて欲しい値(bytes))`の配列を返すように実装します。例えば、先頭に必ず0x10が来て、さらに10個目と11個目に`0xA0`,`0xB0`ときて欲しい場合は
