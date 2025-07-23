@@ -18,3 +18,7 @@ class SerialState(Enum):
     READING = auto()
     ERROR = auto()
 serial_state = SerialState.DISCONNECTED
+
+# File path for logging
+log_raw_file_path = "mainlog.txt"
+log_processed_file_path = "processedlog.txt"
