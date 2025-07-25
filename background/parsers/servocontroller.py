@@ -10,7 +10,7 @@ class ServoControllerParser(AbstractParser):
     def __init__(self):
         self.parser=struct.Struct(">BBxxIffffffffff")
         self.rudder_wing2servo = lambda x: 1.12e-4*x**4 + 5.84e-3*x**3 + -0.0205*x**2 + 4.21*x + 4.39 + 180
-        self.elevator_wing2servo = lambda x: -8.65e-4*x**4 + -0.0301*x**3 + -0.27*x**2 + -6.52*x + -51.2 + 180
+        self.elevator_wing2servo = lambda x: -1.49e-3*x**4 + -0.0401*x**3 + -0.267*x**2 + -6.07*x + -47.1 + 180
         self.list_r = [(self.rudder_wing2servo(i), i) for i in np.arange(-20, 20, 0.01)]
         self.list_e = [(self.elevator_wing2servo(i), i) for i in np.arange(-20, 20, 0.01)]
         # サーボの角度順にソート
