@@ -37,9 +37,9 @@ class Background:
                         data = queue.get()
                         if data == (None, None):
                             print("connection closed")
-                            return
+                            continue
                         print(f"Latest data: {data}")
-                        log_file.write(f"{data[1]}, {data.hex()}\n")
+                        log_file.write(f"{data[1]}, {data[0].hex()}\n")
                         parsed_data, parser_name = self.parser_manager.parse_data(data[0])
                         print(f"Parsed data: {parsed_data}, Parser name: {parser_name}")
                         if parser_name is None:
@@ -57,6 +57,8 @@ class Background:
                             log_count = 0
                     else:
                         threading.Event().wait(0.05)  # Wait for 0.05 seconds before checking again
+
+        print("Background thread stopped.")
 
     def get_background_thread(self, queue: Queue) -> threading.Thread:
         """
